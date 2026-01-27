@@ -1,38 +1,125 @@
-
+// ==================== TORRENT ====================
 export interface Torrent {
-  id: string;
+  _id: string;
+  id?: string;  // alias for _id
+  name: string;
+  infoHash: string;
+  magnetURI?: string;
+  size: number;
+  seeds: number;
+  leeches: number;
+  status: 'pending' | 'downloading' | 'seeding' | 'paused' | 'error' | 'completed';
+  progress: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  eta?: number;
+  peers?: {
+    connected: number;
+    total: number;
+  };
+  files?: TorrentFile[];
+  trackers?: string[];
+  addedAt: string;
+  completedPieces?: number;
+  totalPieces?: number;
+  uploadedBy?: {
+    _id: string;
+    username: string;
+  };
+}
+
+export interface TorrentFile {
   name: string;
   size: number;
-  seeders: number;
-  leechers: number;
-  status: 'pending' | 'downloading' | 'seeding' | 'paused' | 'error' | 'completed';
-  progress?: number;
+  path: string;
 }
 
 export interface TorrentDetail {
+  infoHash: string;
+  name: string;
+  size: number;
+  downloaded: number;
+  total: number;
+  percentage: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  eta: number;
+  state: string;
+  peers: {
+    connected: number;
+    total: number;
+  };
+  seeds: number;
+  leeches: number;
+  pieceCount: number;
   completedPieces: number;
-  totalPieces: number;
-  peers: string[];
+  activePieces: number;
+  pendingRequests: number;
 }
 
+// ==================== USER ====================
 export interface UserProfile {
+  _id: string;
   username: string;
   email: string;
-  torrents: string[];
+  role: 'user' | 'admin';
+  createdAt: string;
+  updatedAt: string;
 }
 
+// ==================== STATS ====================
 export interface SystemStats {
-  totalUsers: number;
+  database: {
+    totalTorrents: number;
+    totalUsers: number;
+    activeTorrents: number;
+  };
+  engine: {
+    totalDownloadSpeed: number;
+    totalUploadSpeed: number;
+    activeTorrents: number;
+    totalTorrents: number;
+    totalDownloaded: number;
+    totalUploaded: number;
+  };
+  timestamp: string;
+}
+
+export interface UserStats {
   totalTorrents: number;
-  activePeers: number;
+  byStatus: {
+    pending: number;
+    downloading: number;
+    seeding: number;
+    paused: number;
+    completed: number;
+    error: number;
+  };
+  totalSize: number;
+  totalDownloaded: number;
+  live: {
+    activeTorrents: number;
+    totalDownloadSpeed: number;
+    totalUploadSpeed: number;
+  };
+  timestamp: string;
 }
 
+// ==================== AUTH ====================
 export interface AuthResponse {
-  userId: string;
   token: string;
+  user?: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  userId?: string;  // legacy
+  message?: string;
 }
 
+// ==================== ERRORS ====================
 export interface ApiError {
-  error: string;
+  error?: string;
+  message?: string;
   code?: number;
 }
