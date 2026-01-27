@@ -1,0 +1,8 @@
+{
+  "name": "TorrentEdge Dashboard",
+  "description": "A high-performance, real-time BitTorrent management dashboard for TorrentEdge, featuring live peer tracking, system statistics, and secure user management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
