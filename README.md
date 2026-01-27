@@ -1,20 +1,89 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# TorrentEdge Dashboard
 
-# Run and deploy your AI Studio app
+A modern, real-time web dashboard for managing and monitoring torrents built with React, TypeScript, and Vite.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1hMYnOgVZ85XgcHrNEDoWMPTME4SfB_KV
+- 🚀 **Real-time Monitoring** - Live updates of torrent status, download/upload speeds, and progress
+- 📊 **System Statistics** - View comprehensive system stats including active torrents, total bandwidth, and storage usage
+- 🎯 **Torrent Management** - Add torrents via magnet links or torrent files, pause/resume downloads
+- 🔐 **Secure Authentication** - JWT-based authentication system
+- 🎨 **Modern UI** - Sleek dark-themed interface with responsive design
+- 📈 **Visual Analytics** - Charts and graphs powered by Recharts
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- **Frontend Framework**: React 19 with TypeScript
+- **Build Tool**: Vite
+- **UI Components**: Custom components with Lucide React icons
+- **Charts**: Recharts for data visualization
+- **Styling**: Tailwind CSS (utility-first approach)
 
+## Prerequisites
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- Node.js (v18 or higher)
+- npm or yarn
+- TorrentEdge backend server running
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd torrentedge-dashboard
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure the API endpoint (if needed):
+   - Update the base URL in `services/api.ts` to point to your TorrentEdge backend
+
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Open your browser and navigate to `http://localhost:5173`
+
+## Build for Production
+
+```bash
+npm run build
+```
+
+The production-ready files will be generated in the `dist/` directory.
+
+## Preview Production Build
+
+```bash
+npm run preview
+```
+
+## Project Structure
+
+```
+torrentedge-dashboard/
+├── components/          # Reusable React components
+│   ├── Navbar.tsx
+│   ├── StatsSection.tsx
+│   └── TorrentCard.tsx
+├── pages/              # Page components
+│   ├── Dashboard.tsx
+│   └── LoginPage.tsx
+├── services/           # API service layer
+│   └── api.ts
+├── types.ts            # TypeScript type definitions
+├── App.tsx             # Main application component
+└── index.tsx           # Application entry point
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License.
