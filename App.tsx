@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { LoginPage } from './pages/LoginPage';
 import { Navbar } from './components/Navbar';
-import { systemService } from './services/api';
+import { healthService } from './services/api';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('te_token'));
@@ -12,7 +12,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        await systemService.health();
+        await healthService.check();
         setHealthStatus('ok');
       } catch (err) {
         setHealthStatus('error');
