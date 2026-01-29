@@ -18,6 +18,11 @@ const getAuthHeadersMultipart = () => {
 async function handleResponse<T>(response: Response): Promise<T> {
   const data = await response.json();
   if (!response.ok) {
+    // Auto-logout on 401 (invalid/expired token)
+    if (response.status === 401) {
+      localStorage.removeItem('te_token');
+      window.location.reload();
+    }
     const err = data as ApiError;
     throw new Error(err.error || err.message || 'Request failed');
   }

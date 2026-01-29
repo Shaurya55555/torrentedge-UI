@@ -108,8 +108,8 @@ export const StatsSection: React.FC<StatsSectionProps> = ({ stats }) => {
         </div>
 
         {/* Chart */}
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-48 min-h-[192px] w-full">
+          <ResponsiveContainer width="100%" height={192}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorDownload" x1="0" y1="0" x2="0" y2="1">
