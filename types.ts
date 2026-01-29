@@ -123,3 +123,17 @@ export interface ApiError {
   message?: string;
   code?: number;
 }
+
+// ==================== SPEED HISTORY ====================
+export interface SpeedSample {
+  timestamp: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+}
+
+export interface SpeedHistoryResponse {
+  history: SpeedSample[];
+  maxSamples: number;
+  intervalMs: number;
+  timestamp: string;
+}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { torrentService, statsService } from '../services/api';
 import { Torrent, SystemStats } from '../types';
 import { StatsSection } from '../components/StatsSection';
+import { SpeedGraph } from '../components/SpeedGraph';
 import { TorrentCard } from '../components/TorrentCard';
 import { Plus, Search, Filter, Upload, Zap, RefreshCw } from 'lucide-react';
 
@@ -145,6 +146,11 @@ export const Dashboard: React.FC = () => {
       )}
 
       <StatsSection stats={stats} />
+
+      {/* Live Speed Graph */}
+      <div className="mb-8">
+        <SpeedGraph refreshInterval={2000} />
+      </div>
 
       {/* Main Content */}
       <div className="bg-zinc-900/30 border border-white/5 rounded-3xl p-6 sm:p-8">

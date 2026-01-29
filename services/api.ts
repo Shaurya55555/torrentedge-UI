@@ -1,4 +1,4 @@
-import { AuthResponse, UserProfile, Torrent, TorrentDetail, SystemStats, ApiError } from '../types';
+import { AuthResponse, UserProfile, Torrent, TorrentDetail, SystemStats, ApiError, SpeedHistoryResponse } from '../types';
 
 const BASE_URL = '/api';
 
@@ -185,6 +185,14 @@ export const statsService = {
       headers: getAuthHeaders(),
     });
     return handleResponse<any>(res);
+  },
+  
+  // Get speed history for graphs (requires auth)
+  getSpeedHistory: async (): Promise<SpeedHistoryResponse> => {
+    const res = await fetch(`${BASE_URL}/statistics/speed-history`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<SpeedHistoryResponse>(res);
   },
 };
 
