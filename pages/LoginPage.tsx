@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { authService } from '../services/api';
-import { Shield, Key, Mail, User, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Key, User, Loader2 } from 'lucide-react';
 
 interface LoginPageProps {
   onAuthSuccess: (token: string) => void;
@@ -11,7 +10,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -24,15 +22,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     setError(null);
 
     try {
-      let res;
-      if (isLogin) {
-        res = await authService.login({
-          email: formData.email,
-          password: formData.password,
-        });
-      } else {
-        res = await authService.register(formData);
-      }
+      const res = isLogin 
+        ? await authService.login({ email: formData.email, password: formData.password })
+        : await authService.register(formData);
       onAuthSuccess(res.token);
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
@@ -42,96 +34,81 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   };
 
   return (
-    <div className="max-w-md mx-auto px-6">
-      <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-8 sm:p-10 shadow-2xl">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-500 mb-6">
-            <Shield size={32} />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">
-            {isLogin ? 'Welcome Back' : 'Create Secure Identity'}
-          </h2>
-          <p className="text-gray-500 text-sm">
-            {isLogin 
-              ? 'Authorized access to TorrentEdge control plane.' 
-              : 'Join the distributed network and start seeding.'}
+    <div className="min-h-[80vh] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-lg font-semibold text-text-primary mb-1">
+            {isLogin ? 'Sign in' : 'Create account'}
+          </h1>
+          <p className="text-sm text-text-tertiary">
+            {isLogin ? 'Welcome back' : 'Get started with TorrentEdge'}
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-sm text-center">
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-sm text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {!isLogin && (
-            <div>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                <input 
-                  type="text" 
-                  required
-                  placeholder="Username"
-                  className="w-full bg-[#0a0a0b] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                />
-              </div>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
+              <input 
+                type="text" 
+                required
+                placeholder="Username"
+                className="w-full bg-bg-tertiary border border-border-subtle rounded px-3 py-2.5 pl-10 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50 transition-colors"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              />
             </div>
           )}
-          <div>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              <input 
-                type="email" 
-                required
-                placeholder="Email Address"
-                className="w-full bg-[#0a0a0b] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
+          
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
+            <input 
+              type="email" 
+              required
+              placeholder="Email"
+              className="w-full bg-bg-tertiary border border-border-subtle rounded px-3 py-2.5 pl-10 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50 transition-colors"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
           </div>
-          <div>
-            <div className="relative">
-              <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              <input 
-                type="password" 
-                required
-                placeholder="Secure Password"
-                className="w-full bg-[#0a0a0b] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
+          
+          <div className="relative">
+            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
+            <input 
+              type="password" 
+              required
+              placeholder="Password"
+              className="w-full bg-bg-tertiary border border-border-subtle rounded px-3 py-2.5 pl-10 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50 transition-colors"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            />
           </div>
 
           <button 
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all mt-4"
+            className="w-full py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded text-sm font-medium transition-colors"
           >
             {loading ? (
-              <Loader2 className="animate-spin" size={20} />
+              <Loader2 className="animate-spin mx-auto" size={18} />
             ) : (
-              <>
-                {isLogin ? 'Access Console' : 'Initialize Node'}
-                <ArrowRight size={18} />
-              </>
+              isLogin ? 'Sign in' : 'Create account'
             )}
           </button>
         </form>
 
-        <div className="mt-8 pt-8 border-t border-white/5 text-center">
-          <p className="text-gray-500 text-sm mb-2">
-            {isLogin ? "New to the Edge?" : "Already verified?"}
-          </p>
+        <div className="mt-6 text-center">
           <button 
             onClick={() => setIsLogin(!isLogin)}
-            className="text-indigo-500 font-bold hover:text-indigo-400 transition-colors"
+            className="text-sm text-text-secondary hover:text-accent transition-colors"
           >
-            {isLogin ? 'Register Node' : 'Log In Instead'}
+            {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
         </div>
       </div>

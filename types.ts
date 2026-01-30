@@ -8,7 +8,7 @@ export interface Torrent {
   size: number;
   seeds: number;
   leeches: number;
-  status: 'pending' | 'downloading' | 'seeding' | 'paused' | 'error' | 'completed';
+  status: 'pending' | 'downloading' | 'seeding' | 'paused' | 'error' | 'completed' | 'fetching_metadata' | 'idle' | 'checking' | 'queued';
   progress: number;
   downloadSpeed: number;
   uploadSpeed: number;
@@ -31,7 +31,15 @@ export interface Torrent {
 export interface TorrentFile {
   name: string;
   size: number;
+  path?: string;
+}
+
+export interface FileWithSelection {
+  index: number;
+  name: string;
   path: string;
+  length: number;
+  selected: boolean;
 }
 
 export interface TorrentDetail {
@@ -55,6 +63,7 @@ export interface TorrentDetail {
   completedPieces: number;
   activePieces: number;
   pendingRequests: number;
+  bitfield?: number[]; // 0=missing, 1=downloading, 2=complete
 }
 
 // ==================== USER ====================
@@ -81,6 +90,13 @@ export interface SystemStats {
     totalTorrents: number;
     totalDownloaded: number;
     totalUploaded: number;
+  };
+  dht?: {
+    enabled: boolean;
+    running: boolean;
+    nodes: number;
+    port?: number;
+    nodeId?: string;
   };
   timestamp: string;
 }
@@ -136,4 +152,22 @@ export interface SpeedHistoryResponse {
   maxSamples: number;
   intervalMs: number;
   timestamp: string;
+}
+
+// ==================== SETTINGS ====================
+export interface EngineSettings {
+  downloadPath: string;
+  maxActiveTorrents: number;
+  maxConcurrent: number;
+  port: number;
+  dht: {
+    enabled: boolean;
+    port: number;
+    running: boolean;
+    nodes: number;
+  };
+  speedLimits: {
+    download: number;
+    upload: number;
+  };
 }

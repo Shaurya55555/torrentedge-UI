@@ -1,34 +1,92 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TorrentEdge | Distributed BitTorrent Control</title>
+    <title>TorrentEdge</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              // Backgrounds
+              'bg-primary': '#0a0a0a',
+              'bg-secondary': '#111111',
+              'bg-tertiary': '#191919',
+              'bg-hover': '#1f1f1f',
+              // Borders  
+              'border-subtle': '#1f1f1f',
+              'border-muted': '#2a2a2a',
+              'border-emphasis': '#333333',
+              // Text
+              'text-primary': '#fafafa',
+              'text-secondary': '#a0a0a0',
+              'text-tertiary': '#666666',
+              // Accent
+              'accent': '#3b82f6',
+              'accent-hover': '#2563eb',
+            },
+            fontFamily: {
+              sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+              mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
+            },
+            fontSize: {
+              'xs': '0.75rem',
+              'sm': '0.8125rem',
+              'base': '0.875rem',
+              'md': '1rem',
+              'lg': '1.125rem',
+              'xl': '1.5rem',
+            },
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0a0a0b;
-            color: #e4e4e7;
+            font-size: 0.875rem;
+            background-color: #0a0a0a;
+            color: #fafafa;
         }
-        .mono {
-            font-family: 'JetBrains Mono', monospace;
-        }
+        /* Minimal scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
+            height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #0a0a0b;
+            background: transparent;
         }
         ::-webkit-scrollbar-thumb {
-            background: #27272a;
-            border-radius: 4px;
+            background: #333;
+            border-radius: 3px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #3f3f46;
+            background: #444;
         }
+        /* Selection */
+        ::selection {
+            background: #3b82f640;
+        }
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes zoomIn95 {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-in { animation-fill-mode: both; }
+        .fade-in { animation-name: fadeIn; }
+        .zoom-in-95 { animation-name: zoomIn95; }
+        .duration-150 { animation-duration: 150ms; }
     </style>
 <script type="importmap">
 {
@@ -41,10 +99,9 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

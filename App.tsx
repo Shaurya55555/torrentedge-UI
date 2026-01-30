@@ -1,29 +1,46 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './pages/Dashboard';
+import { Settings } from './pages/Settings';
 import { LoginPage } from './pages/LoginPage';
 import { Navbar } from './components/Navbar';
-import { healthService } from './services/api';
+import { MobileNav } from './components/MobileNav';
+import { ToastProvider } from './components/Toast';
+import { ConfirmProvider } from './components/ConfirmDialog';
+import { healthService, userService } from './services/api';
+import { UserProfile } from './types';
+
+type Page = 'dashboard' | 'settings';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('te_token'));
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [healthStatus, setHealthStatus] = useState<'ok' | 'error' | 'loading'>('loading');
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 
   useEffect(() => {
     const checkHealth = async () => {
       try {
         await healthService.check();
         setHealthStatus('ok');
-      } catch (err) {
+      } catch {
         setHealthStatus('error');
       }
     };
     checkHealth();
-    
-    // Polling health check
     const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch user profile when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      userService.getProfile()
+        .then(setUser)
+        .catch(() => setUser(null));
+    } else {
+      setUser(null);
+    }
+  }, [isAuthenticated]);
 
   const handleAuthSuccess = (token: string) => {
     localStorage.setItem('te_token', token);
@@ -33,19 +50,22 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('te_token');
     setIsAuthenticated(false);
+    setUser(null);
   };
 
+  // Error state
   if (healthStatus === 'error') {
     return (
-      <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center p-6">
-        <div className="bg-red-900/20 border border-red-500/50 p-8 rounded-xl text-center max-w-md">
-          <h1 className="text-2xl font-bold text-red-500 mb-4">System Offline</h1>
-          <p className="text-gray-400 mb-6">TorrentEdge backend services are currently unreachable. Please ensure the server is running and try again.</p>
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <p className="text-text-secondary mb-4">
+            Cannot connect to TorrentEdge server.
+          </p>
           <button 
             onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
+            className="px-4 py-2 bg-bg-secondary border border-border-subtle rounded text-sm hover:bg-bg-tertiary transition-colors"
           >
-            Retry Connection
+            Retry
           </button>
         </div>
       </div>
@@ -53,16 +73,36 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] text-gray-200">
-      <Navbar isAuthenticated={isAuthenticated} onLogout={handleLogout} />
-      <main className="pt-20 pb-12">
-        {isAuthenticated ? (
-          <Dashboard />
-        ) : (
-          <LoginPage onAuthSuccess={handleAuthSuccess} />
-        )}
-      </main>
-    </div>
+    <ConfirmProvider>
+      <ToastProvider>
+        <div className="min-h-screen bg-bg-primary text-text-primary">
+          <Navbar 
+            isAuthenticated={isAuthenticated} 
+            onLogout={handleLogout}
+            currentPage={currentPage}
+            onNavigate={setCurrentPage}
+            username={user?.username}
+          />
+          
+          <main className="pt-12 pb-16 sm:pb-6">
+            {isAuthenticated ? (
+              currentPage === 'settings' ? <Settings /> : <Dashboard />
+            ) : (
+              <LoginPage onAuthSuccess={handleAuthSuccess} />
+            )}
+          </main>
+
+          {/* Mobile bottom nav */}
+          {isAuthenticated && (
+            <MobileNav 
+              currentPage={currentPage}
+              onNavigate={setCurrentPage}
+              onLogout={handleLogout}
+            />
+          )}
+        </div>
+      </ToastProvider>
+    </ConfirmProvider>
   );
 };
 

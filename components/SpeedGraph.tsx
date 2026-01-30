@@ -1,234 +1,222 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, Wifi, WifiOff } from 'lucide-react';
-import { statsService } from '../services/api';
-import { SpeedSample } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSpeedSocket } from '../hooks/useSocket';
+import { ArrowDown, ArrowUp, Activity } from 'lucide-react';
 
-interface SpeedGraphProps {
-  refreshInterval?: number; // in ms, fallback polling interval (default 2000)
+interface SpeedSample {
+  download: number;
+  upload: number;
+  timestamp: number;
 }
 
-export const SpeedGraph: React.FC<SpeedGraphProps> = ({ refreshInterval = 2000 }) => {
-  const [history, setHistory] = useState<SpeedSample[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const historyRef = useRef<SpeedSample[]>([]);
-  
-  // Socket.IO hook for live updates
+const MAX_SAMPLES = 60;
+
+const formatSpeed = (bytes: number): string => {
+  if (bytes === 0) return '0 B/s';
+  const k = 1024;
+  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
+
+export const SpeedGraph: React.FC = () => {
+  const [samples, setSamples] = useState<SpeedSample[]>([]);
   const { latestSpeed, isConnected } = useSpeedSocket();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Format bytes/sec to human readable
-  const formatSpeed = (bytesPerSec: number): string => {
-    if (!bytesPerSec || bytesPerSec === 0) return '0 B/s';
-    const k = 1024;
-    const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
-    const i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
-    return parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
-  // Format timestamp to relative seconds (e.g., "-30s")
-  const formatTime = (timestamp: number, latestTimestamp: number): string => {
-    const diff = Math.round((timestamp - latestTimestamp) / 1000);
-    return `${diff}s`;
-  };
-
-  // Initial fetch to populate history
-  const fetchHistory = useCallback(async () => {
-    try {
-      const response = await statsService.getSpeedHistory();
-      setHistory(response.history);
-      historyRef.current = response.history;
-      setError(null);
-    } catch (err: any) {
-      console.error('Failed to fetch speed history:', err);
-      setError(err.message || 'Failed to fetch speed history');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Initial fetch
+  // Add new samples
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
-
-  // Handle live socket updates - append to history
-  useEffect(() => {
-    if (latestSpeed && isConnected) {
-      setHistory(prev => {
-        const newHistory = [...prev, latestSpeed];
-        // Keep only last 60 samples
-        if (newHistory.length > 60) {
-          newHistory.shift();
-        }
-        historyRef.current = newHistory;
-        return newHistory;
+    if (latestSpeed) {
+      setSamples(prev => {
+        const newSample: SpeedSample = {
+          download: latestSpeed.downloadSpeed,
+          upload: latestSpeed.uploadSpeed,
+          timestamp: latestSpeed.timestamp,
+        };
+        return [...prev, newSample].slice(-MAX_SAMPLES);
       });
     }
-  }, [latestSpeed, isConnected]);
+  }, [latestSpeed]);
 
-  // Fallback polling when socket is disconnected
+  // Draw the graph
   useEffect(() => {
-    if (isConnected) {
-      // Socket is connected, no need for polling
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.offsetWidth;
+    const height = canvas.offsetHeight;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear with subtle gradient background
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+    bgGradient.addColorStop(0, 'rgba(17, 17, 17, 0.8)');
+    bgGradient.addColorStop(1, 'rgba(10, 10, 10, 0.9)');
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw grid lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) {
+      const y = (height / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    if (samples.length < 2) {
+      // Empty state
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Waiting for data...', width / 2, height / 2 + 4);
       return;
     }
 
-    // Socket disconnected, use polling as fallback
-    const interval = setInterval(fetchHistory, refreshInterval);
-    return () => clearInterval(interval);
-  }, [isConnected, fetchHistory, refreshInterval]);
+    const maxValue = Math.max(
+      ...samples.map(s => Math.max(s.download, s.upload)),
+      10 * 1024 // Min 10 KB/s scale
+    ) * 1.1; // Add 10% headroom
 
-  // Transform data for chart
-  const chartData = history.map((sample, index) => {
-    const latestTimestamp = history.length > 0 ? history[history.length - 1].timestamp : sample.timestamp;
-    return {
-      time: formatTime(sample.timestamp, latestTimestamp),
-      download: sample.downloadSpeed,
-      upload: sample.uploadSpeed,
-      index
+    const paddedSamples = Array(MAX_SAMPLES - samples.length).fill({ download: 0, upload: 0 }).concat(samples);
+
+    const drawArea = (data: number[], color: string, glowColor: string) => {
+      const points: [number, number][] = data.map((value, i) => {
+        const x = (i / (MAX_SAMPLES - 1)) * width;
+        const y = height - (value / maxValue) * (height - 8) - 4;
+        return [x, y];
+      });
+
+      // Glow effect
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+
+      // Fill gradient
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      points.forEach(([x, y]) => ctx.lineTo(x, y));
+      ctx.lineTo(width, height);
+      ctx.closePath();
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, color.replace('1)', '0.4)'));
+      gradient.addColorStop(0.5, color.replace('1)', '0.15)'));
+      gradient.addColorStop(1, color.replace('1)', '0)'));
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Line
+      ctx.beginPath();
+      points.forEach(([x, y], i) => {
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      // End dot (pulsing effect via CSS)
+      const lastPoint = points[points.length - 1];
+      if (data[data.length - 1] > 0) {
+        ctx.beginPath();
+        ctx.arc(lastPoint[0], lastPoint[1], 4, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(lastPoint[0], lastPoint[1], 6, 0, Math.PI * 2);
+        ctx.strokeStyle = color.replace('1)', '0.5)');
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
     };
-  });
 
-  // Calculate max for Y axis
-  const maxSpeed = Math.max(
-    ...history.map(s => Math.max(s.downloadSpeed, s.uploadSpeed)),
-    1024 // minimum 1 KB/s for scale
-  );
-
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-zinc-900 border border-white/10 rounded-lg p-3 shadow-xl">
-          <p className="text-gray-400 text-xs mb-2">{label}</p>
-          <p className="text-blue-400 text-sm">
-            ↓ {formatSpeed(payload[0]?.value || 0)}
-          </p>
-          <p className="text-emerald-400 text-sm">
-            ↑ {formatSpeed(payload[1]?.value || 0)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  if (loading && history.length === 0) {
-    return (
-      <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Activity size={20} className="text-indigo-500 animate-pulse" />
-          <h3 className="font-semibold text-gray-300">Live Speed Graph</h3>
-        </div>
-        <div className="h-48 flex items-center justify-center text-gray-500">
-          Loading speed data...
-        </div>
-      </div>
+    // Draw upload first (behind)
+    drawArea(
+      paddedSamples.map(s => s.upload),
+      'rgba(34, 197, 94, 1)',
+      'rgba(34, 197, 94, 0.5)'
     );
-  }
 
-  if (error && history.length === 0) {
-    return (
-      <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Activity size={20} className="text-red-500" />
-          <h3 className="font-semibold text-gray-300">Live Speed Graph</h3>
-        </div>
-        <div className="h-48 flex items-center justify-center text-red-400">
-          {error}
-        </div>
-      </div>
+    // Draw download on top
+    drawArea(
+      paddedSamples.map(s => s.download),
+      'rgba(59, 130, 246, 1)',
+      'rgba(59, 130, 246, 0.5)'
     );
-  }
+
+  }, [samples]);
+
+  const currentDownload = samples.length > 0 ? samples[samples.length - 1].download : 0;
+  const currentUpload = samples.length > 0 ? samples[samples.length - 1].upload : 0;
+  const peakDownload = Math.max(...samples.map(s => s.download), 0);
+  const peakUpload = Math.max(...samples.map(s => s.upload), 0);
 
   return (
-    <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-bg-secondary rounded-lg border border-border-subtle overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
         <div className="flex items-center gap-2">
-          <Activity size={20} className="text-indigo-500" />
-          <h3 className="font-semibold text-gray-300">Live Speed Graph</h3>
-          {isConnected ? (
-            <Wifi size={14} className="text-emerald-500" title="Live updates" />
-          ) : (
-            <WifiOff size={14} className="text-yellow-500" title="Polling mode" />
-          )}
+          <Activity size={14} className="text-text-tertiary" />
+          <span className="text-xs font-medium text-text-secondary">Network Activity</span>
         </div>
-        <div className="flex gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span className="text-gray-400">Download</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-            <span className="text-gray-400">Upload</span>
-          </div>
+        <div className={`flex items-center gap-1.5 text-xs ${isConnected ? 'text-green-500' : 'text-text-tertiary'}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-text-tertiary'}`} />
+          {isConnected ? 'Live' : 'Offline'}
         </div>
       </div>
 
-      <div className="h-48 min-h-[192px] w-full">
-        <ResponsiveContainer width="100%" height={192}>
-          <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-            <defs>
-              <linearGradient id="colorDownloadGraph" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="colorUploadGraph" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-            <XAxis 
-              dataKey="time" 
-              stroke="#52525b" 
-              fontSize={10} 
-              tickLine={false} 
-              axisLine={false}
-              interval="preserveStartEnd"
-            />
-            <YAxis 
-              stroke="#52525b" 
-              fontSize={10} 
-              tickLine={false} 
-              axisLine={false}
-              tickFormatter={(value) => {
-                if (value === 0) return '0';
-                if (value >= 1048576) return `${(value / 1048576).toFixed(0)}M`;
-                if (value >= 1024) return `${(value / 1024).toFixed(0)}K`;
-                return `${value}`;
-              }}
-              domain={[0, maxSpeed * 1.1]}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Area 
-              type="monotone" 
-              dataKey="download" 
-              stroke="#3b82f6" 
-              fillOpacity={1} 
-              fill="url(#colorDownloadGraph)" 
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-            <Area 
-              type="monotone" 
-              dataKey="upload" 
-              stroke="#10b981" 
-              fillOpacity={1} 
-              fill="url(#colorUploadGraph)" 
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      {/* Graph */}
+      <div className="relative h-28">
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+        />
       </div>
 
-      <div className="mt-3 text-center text-xs text-gray-500">
-        Last {history.length} seconds • {isConnected ? 'Live updates' : `Polling every ${refreshInterval / 1000}s`}
+      {/* Speed stats */}
+      <div className="grid grid-cols-2 divide-x divide-border-subtle border-t border-border-subtle">
+        {/* Download */}
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-2 mb-1">
+            <ArrowDown size={14} className="text-accent" />
+            <span className="text-xs text-text-tertiary">Download</span>
+          </div>
+          <div className="text-lg font-semibold text-text-primary tabular-nums">
+            {formatSpeed(currentDownload)}
+          </div>
+          <div className="text-xs text-text-tertiary mt-0.5">
+            Peak: {formatSpeed(peakDownload)}
+          </div>
+        </div>
+
+        {/* Upload */}
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-2 mb-1">
+            <ArrowUp size={14} className="text-green-500" />
+            <span className="text-xs text-text-tertiary">Upload</span>
+          </div>
+          <div className="text-lg font-semibold text-text-primary tabular-nums">
+            {formatSpeed(currentUpload)}
+          </div>
+          <div className="text-xs text-text-tertiary mt-0.5">
+            Peak: {formatSpeed(peakUpload)}
+          </div>
+        </div>
       </div>
     </div>
   );

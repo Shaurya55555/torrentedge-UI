@@ -1,4 +1,4 @@
-import { AuthResponse, UserProfile, Torrent, TorrentDetail, SystemStats, ApiError, SpeedHistoryResponse } from '../types';
+import { AuthResponse, UserProfile, Torrent, TorrentDetail, SystemStats, ApiError, SpeedHistoryResponse, FileWithSelection, EngineSettings } from '../types';
 
 const BASE_URL = '/api';
 
@@ -161,6 +161,34 @@ export const torrentService = {
     });
     return handleResponse<Torrent[]>(res);
   },
+  
+  // Get files with selection status
+  getFiles: async (id: string): Promise<{ files: FileWithSelection[]; selectedCount: number; totalCount: number }> => {
+    const res = await fetch(`${BASE_URL}/torrent/${id}/files`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(res);
+  },
+  
+  // Select files for download
+  selectFiles: async (id: string, fileIndices: number[]): Promise<{ files: FileWithSelection[]; selectedCount: number; totalCount: number }> => {
+    const res = await fetch(`${BASE_URL}/torrent/${id}/files/select`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ fileIndices }),
+    });
+    return handleResponse(res);
+  },
+  
+  // Select all files
+  selectAllFiles: async (id: string): Promise<{ files: FileWithSelection[]; selectedCount: number; totalCount: number }> => {
+    const res = await fetch(`${BASE_URL}/torrent/${id}/files/select`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ selectAll: true }),
+    });
+    return handleResponse(res);
+  },
 };
 
 // ==================== STATISTICS ====================
@@ -193,6 +221,45 @@ export const statsService = {
       headers: getAuthHeaders(),
     });
     return handleResponse<SpeedHistoryResponse>(res);
+  },
+};
+
+// ==================== SETTINGS ====================
+export const settingsService = {
+  // Get current settings
+  get: async (): Promise<EngineSettings> => {
+    const res = await fetch(`${BASE_URL}/settings`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<EngineSettings>(res);
+  },
+  
+  // Update settings
+  update: async (settings: Partial<EngineSettings>): Promise<{ message: string; settings: EngineSettings }> => {
+    const res = await fetch(`${BASE_URL}/settings`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(settings),
+    });
+    return handleResponse(res);
+  },
+  
+  // Update speed limits
+  setSpeedLimits: async (download: number, upload: number): Promise<{ message: string; speedLimits: { download: number; upload: number } }> => {
+    const res = await fetch(`${BASE_URL}/settings/speed-limits`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ download, upload }),
+    });
+    return handleResponse(res);
+  },
+  
+  // Get DHT status
+  getDHTStatus: async () => {
+    const res = await fetch(`${BASE_URL}/settings/dht`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(res);
   },
 };
 
