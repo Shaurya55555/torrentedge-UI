@@ -4,6 +4,7 @@ import { Torrent, SystemStats } from '../types';
 import { StatsSection } from '../components/StatsSection';
 import { SpeedGraph } from '../components/SpeedGraph';
 import { TorrentCard } from '../components/TorrentCard';
+import { TorrentDetailModal } from '../components/TorrentDetailModal';
 import { Plus, Search, Filter, Upload, Zap, RefreshCw } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -12,6 +13,7 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedTorrent, setSelectedTorrent] = useState<Torrent | null>(null);
   const [magnetInput, setMagnetInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +191,7 @@ export const Dashboard: React.FC = () => {
                 onPause={() => handlePause(torrent.infoHash || torrent._id)}
                 onResume={() => handleResume(torrent.infoHash || torrent._id)}
                 onDelete={() => handleDelete(torrent.infoHash || torrent._id)}
+                onViewDetails={() => setSelectedTorrent(torrent)}
               />
             ))}
           </div>
@@ -239,6 +242,14 @@ export const Dashboard: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Torrent Detail Modal */}
+      {selectedTorrent && (
+        <TorrentDetailModal 
+          torrent={selectedTorrent} 
+          onClose={() => setSelectedTorrent(null)} 
+        />
       )}
     </div>
   );

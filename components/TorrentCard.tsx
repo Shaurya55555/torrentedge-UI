@@ -1,15 +1,16 @@
 import React from 'react';
 import { Torrent } from '../types';
-import { Download, Upload, Server, Play, Pause, Trash2, Info, ArrowDown, ArrowUp } from 'lucide-react';
+import { Download, Upload, Server, Play, Pause, Trash2, Info, ArrowDown, ArrowUp, Eye } from 'lucide-react';
 
 interface TorrentCardProps {
   torrent: Torrent;
   onPause?: () => void;
   onResume?: () => void;
   onDelete?: () => void;
+  onViewDetails?: () => void;
 }
 
-export const TorrentCard: React.FC<TorrentCardProps> = ({ torrent, onPause, onResume, onDelete }) => {
+export const TorrentCard: React.FC<TorrentCardProps> = ({ torrent, onPause, onResume, onDelete, onViewDetails }) => {
   const formatSize = (bytes: number) => {
     if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
@@ -40,6 +41,8 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({ torrent, onPause, onRe
     completed: 'bg-indigo-500/20 text-indigo-500 border-indigo-500/30',
     idle: 'bg-gray-500/20 text-gray-500 border-gray-500/30',
     checking: 'bg-orange-500/20 text-orange-500 border-orange-500/30',
+    fetching_metadata: 'bg-purple-500/20 text-purple-500 border-purple-500/30',
+    queued: 'bg-cyan-500/20 text-cyan-500 border-cyan-500/30',
   };
 
   const isPaused = torrent.status === 'paused';
@@ -60,6 +63,13 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({ torrent, onPause, onRe
           </div>
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button 
+            onClick={onViewDetails}
+            className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-indigo-500 transition-colors"
+            title="View Details"
+          >
+            <Eye size={16} />
+          </button>
           {isPaused ? (
             <button 
               onClick={onResume}

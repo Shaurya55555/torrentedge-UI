@@ -1,17 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity } from 'lucide-react';
+import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { statsService } from '../services/api';
 import { SpeedSample } from '../types';
+import { useSpeedSocket } from '../hooks/useSocket';
 
 interface SpeedGraphProps {
-  refreshInterval?: number; // in ms, default 2000
+  refreshInterval?: number; // in ms, fallback polling interval (default 2000)
 }
 
 export const SpeedGraph: React.FC<SpeedGraphProps> = ({ refreshInterval = 2000 }) => {
   const [history, setHistory] = useState<SpeedSample[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const historyRef = useRef<SpeedSample[]>([]);
+  
+  // Socket.IO hook for live updates
+  const { latestSpeed, isConnected } = useSpeedSocket();
 
   // Format bytes/sec to human readable
   const formatSpeed = (bytesPerSec: number): string => {
@@ -28,10 +33,12 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({ refreshInterval = 2000 }
     return `${diff}s`;
   };
 
+  // Initial fetch to populate history
   const fetchHistory = useCallback(async () => {
     try {
       const response = await statsService.getSpeedHistory();
       setHistory(response.history);
+      historyRef.current = response.history;
       setError(null);
     } catch (err: any) {
       console.error('Failed to fetch speed history:', err);
@@ -41,11 +48,37 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({ refreshInterval = 2000 }
     }
   }, []);
 
+  // Initial fetch
   useEffect(() => {
     fetchHistory();
+  }, [fetchHistory]);
+
+  // Handle live socket updates - append to history
+  useEffect(() => {
+    if (latestSpeed && isConnected) {
+      setHistory(prev => {
+        const newHistory = [...prev, latestSpeed];
+        // Keep only last 60 samples
+        if (newHistory.length > 60) {
+          newHistory.shift();
+        }
+        historyRef.current = newHistory;
+        return newHistory;
+      });
+    }
+  }, [latestSpeed, isConnected]);
+
+  // Fallback polling when socket is disconnected
+  useEffect(() => {
+    if (isConnected) {
+      // Socket is connected, no need for polling
+      return;
+    }
+
+    // Socket disconnected, use polling as fallback
     const interval = setInterval(fetchHistory, refreshInterval);
     return () => clearInterval(interval);
-  }, [fetchHistory, refreshInterval]);
+  }, [isConnected, fetchHistory, refreshInterval]);
 
   // Transform data for chart
   const chartData = history.map((sample, index) => {
@@ -96,7 +129,7 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({ refreshInterval = 2000 }
     );
   }
 
-  if (error) {
+  if (error && history.length === 0) {
     return (
       <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -116,6 +149,11 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({ refreshInterval = 2000 }
         <div className="flex items-center gap-2">
           <Activity size={20} className="text-indigo-500" />
           <h3 className="font-semibold text-gray-300">Live Speed Graph</h3>
+          {isConnected ? (
+            <Wifi size={14} className="text-emerald-500" title="Live updates" />
+          ) : (
+            <WifiOff size={14} className="text-yellow-500" title="Polling mode" />
+          )}
         </div>
         <div className="flex gap-4 text-xs">
           <div className="flex items-center gap-2">
@@ -190,7 +228,7 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({ refreshInterval = 2000 }
       </div>
 
       <div className="mt-3 text-center text-xs text-gray-500">
-        Last {history.length} seconds • Updates every {refreshInterval / 1000}s
+        Last {history.length} seconds • {isConnected ? 'Live updates' : `Polling every ${refreshInterval / 1000}s`}
       </div>
     </div>
   );
