@@ -1,10 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { authService } from '../services/api';
 import { Mail, Key, User, Loader2 } from 'lucide-react';
+
+// Extend window for Google's GSI
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          renderButton: (element: HTMLElement, options: any) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
 
 interface LoginPageProps {
   onAuthSuccess: (token: string) => void;
 }
+
+const GOOGLE_CLIENT_ID = '82443172011-epqpinmfmil3inigvr9gf346kvmg3u72.apps.googleusercontent.com';
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,6 +32,61 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     email: '',
     password: '',
   });
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  // Initialize Google Sign-In
+  useEffect(() => {
+    const initializeGoogle = () => {
+      if (window.google && googleButtonRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleResponse,
+        });
+
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          width: 320,
+          text: isLogin ? 'signin_with' : 'signup_with',
+          shape: 'rectangular',
+        });
+      }
+    };
+
+    // Check if Google script is already loaded
+    if (window.google) {
+      initializeGoogle();
+    } else {
+      // Wait for script to load
+      const checkGoogle = setInterval(() => {
+        if (window.google) {
+          clearInterval(checkGoogle);
+          initializeGoogle();
+        }
+      }, 100);
+
+      // Cleanup after 10 seconds
+      const timeout = setTimeout(() => clearInterval(checkGoogle), 10000);
+      return () => {
+        clearInterval(checkGoogle);
+        clearTimeout(timeout);
+      };
+    }
+  }, [isLogin]);
+
+  const handleGoogleResponse = async (response: any) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await authService.googleAuth(response.credential);
+      onAuthSuccess(data.token);
+    } catch (err: any) {
+      setError(err.message || 'Google authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +122,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
             {error}
           </div>
         )}
+
+        {/* Google Sign-In Button */}
+        <div className="mb-6 flex justify-center">
+          <div ref={googleButtonRef}></div>
+        </div>
+
+        {/* Divider */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border-subtle"></div>
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="px-3 bg-bg-primary text-text-tertiary">or continue with email</span>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {!isLogin && (
