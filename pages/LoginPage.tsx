@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { authService } from '../services/api';
 import { Mail, Key, User, Loader2 } from 'lucide-react';
 
@@ -11,6 +11,7 @@ declare global {
           initialize: (config: any) => void;
           renderButton: (element: HTMLElement, options: any) => void;
           prompt: () => void;
+          cancel: () => void;
         };
       };
     };
@@ -21,26 +22,84 @@ interface LoginPageProps {
   onAuthSuccess: (token: string) => void;
 }
 
-const GOOGLE_CLIENT_ID = '82443172011-epqpinmfmil3inigvr9gf346kvmg3u72.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '82443172011-epqpinmfmil3inigvr9gf346kvmg3u72.apps.googleusercontent.com';
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [googleLoaded, setGoogleLoaded] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
   });
   const googleButtonRef = useRef<HTMLDivElement>(null);
+  const isInitializedRef = useRef(false);
+
+  // Stable callback for Google Sign-In
+  const handleGoogleResponse = useCallback(async (response: any) => {
+    console.log('[Google Auth] Response received:', response);
+    
+    if (!response.credential) {
+      console.error('[Google Auth] No credential in response:', response);
+      setError('Google authentication failed: No credential received');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('[Google Auth] Sending credential to backend...');
+      const data = await authService.googleAuth(response.credential);
+      console.log('[Google Auth] Backend response:', data);
+      onAuthSuccess(data.token);
+    } catch (err: any) {
+      console.error('[Google Auth] Backend error:', err);
+      setError(err.message || 'Google authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuthSuccess]);
 
   // Initialize Google Sign-In
   useEffect(() => {
+    let checkInterval: NodeJS.Timeout | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let mounted = true;
+
     const initializeGoogle = () => {
-      if (window.google && googleButtonRef.current) {
+      if (!mounted) return;
+      
+      if (!window.google) {
+        console.error('[Google Auth] Google SDK not loaded');
+        return;
+      }
+      
+      if (!googleButtonRef.current) {
+        console.warn('[Google Auth] Button ref not ready, retrying...');
+        setTimeout(initializeGoogle, 100);
+        return;
+      }
+
+      console.log('[Google Auth] Initializing with client ID:', GOOGLE_CLIENT_ID);
+      
+      try {
+        // Cancel any previous Google prompt
+        if (isInitializedRef.current) {
+          window.google.accounts.id.cancel();
+        }
+        
+        // Clear previous button content
+        googleButtonRef.current.innerHTML = '';
+        
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleResponse,
+          use_fedcm_for_prompt: false,
+          auto_select: false,
+          cancel_on_tap_outside: true,
         });
 
         window.google.accounts.id.renderButton(googleButtonRef.current, {
@@ -50,43 +109,55 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
           text: isLogin ? 'signin_with' : 'signup_with',
           shape: 'rectangular',
         });
+        
+        isInitializedRef.current = true;
+        setGoogleLoaded(true);
+        console.log('[Google Auth] Initialization complete');
+      } catch (err) {
+        console.error('[Google Auth] Initialization error:', err);
+        setError('Failed to initialize Google Sign-In');
       }
     };
 
     // Check if Google script is already loaded
     if (window.google) {
+      console.log('[Google Auth] Google SDK already loaded');
       initializeGoogle();
     } else {
+      console.log('[Google Auth] Waiting for Google SDK to load...');
       // Wait for script to load
-      const checkGoogle = setInterval(() => {
+      checkInterval = setInterval(() => {
         if (window.google) {
-          clearInterval(checkGoogle);
+          if (checkInterval) clearInterval(checkInterval);
           initializeGoogle();
         }
       }, 100);
 
-      // Cleanup after 10 seconds
-      const timeout = setTimeout(() => clearInterval(checkGoogle), 10000);
-      return () => {
-        clearInterval(checkGoogle);
-        clearTimeout(timeout);
-      };
+      // Timeout after 10 seconds
+      timeoutId = setTimeout(() => {
+        if (checkInterval) clearInterval(checkInterval);
+        if (mounted && !window.google) {
+          console.error('[Google Auth] Google SDK failed to load (timeout)');
+          setError('Google Sign-In unavailable. Please try email login or disable ad blockers.');
+        }
+      }, 10000);
     }
-  }, [isLogin]);
 
-  const handleGoogleResponse = async (response: any) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const data = await authService.googleAuth(response.credential);
-      onAuthSuccess(data.token);
-    } catch (err: any) {
-      setError(err.message || 'Google authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Cleanup function
+    return () => {
+      mounted = false;
+      if (checkInterval) clearInterval(checkInterval);
+      if (timeoutId) clearTimeout(timeoutId);
+      // Cancel Google prompt on unmount
+      if (window.google && isInitializedRef.current) {
+        try {
+          window.google.accounts.id.cancel();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+    };
+  }, [isLogin, handleGoogleResponse]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,8 +195,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
         )}
 
         {/* Google Sign-In Button */}
-        <div className="mb-6 flex justify-center">
-          <div ref={googleButtonRef}></div>
+        <div className="mb-6 flex justify-center min-h-[44px]">
+          {!googleLoaded && !error && (
+            <div className="flex items-center gap-2 text-text-tertiary text-sm">
+              <Loader2 className="animate-spin" size={16} />
+              <span>Loading Google Sign-In...</span>
+            </div>
+          )}
+          <div 
+            ref={googleButtonRef} 
+            className={googleLoaded ? '' : 'hidden'}
+          ></div>
         </div>
 
         {/* Divider */}
