@@ -75,12 +75,23 @@ function releaseSharedSocket() {
 // ==================== MAIN SOCKET HOOK ====================
 interface UseSocketOptions {
   onProgress?: (data: TorrentEvent) => void;
+  onHashProgress?: (data: HashProgressEvent) => void;
   onSpeedUpdate?: (data: SpeedEvent) => void;
   enableToasts?: boolean;
 }
 
+interface HashProgressEvent {
+  userId: string;
+  fileName: string;
+  hashed: number;
+  total: number;
+  percent: number;
+  done?: boolean;
+  timestamp: number;
+}
+
 export const useSocket = (options: UseSocketOptions = {}) => {
-  const { onProgress, onSpeedUpdate, enableToasts = true } = options;
+  const { onProgress, onHashProgress, onSpeedUpdate, enableToasts = true } = options;
   const toastRef = useRef(useToast());
   const toast = toastRef.current;
 
@@ -133,11 +144,16 @@ export const useSocket = (options: UseSocketOptions = {}) => {
       onProgress?.(data);
     };
 
+    const handleHashProgress = (data: HashProgressEvent) => {
+      onHashProgress?.(data);
+    };
+
     socket.on('torrent:added', handleAdded);
     socket.on('torrent:started', handleStarted);
     socket.on('torrent:completed', handleCompleted);
     socket.on('torrent:error', handleError);
     socket.on('torrent:progress', handleProgress);
+    socket.on('torrent:hash-progress', handleHashProgress);
 
     return () => {
       socket.off('torrent:added', handleAdded);
@@ -145,6 +161,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
       socket.off('torrent:completed', handleCompleted);
       socket.off('torrent:error', handleError);
       socket.off('torrent:progress', handleProgress);
+      socket.off('torrent:hash-progress', handleHashProgress);
 
       if (onSpeedUpdate) {
         speedListeners.delete(onSpeedUpdate);

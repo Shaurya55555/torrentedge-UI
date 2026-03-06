@@ -117,7 +117,42 @@ export const torrentService = {
     return handleResponse<Torrent>(res);
   },
   
-  // Add magnet link (not yet supported by backend)
+  // Create torrent from any file (Phase 4.1)
+  createFromFile: async (
+    file: File,
+    name?: string,
+    options?: {
+      pieceSize?: number;   // bytes, e.g. 262144 for 256 KB
+      private?: boolean;
+      trackers?: string[];
+    }
+  ): Promise<{
+    torrent: Torrent;
+    infoHash: string;
+    magnetURI: string;
+    torrentFileName: string;
+    torrentFile: string;      // base64-encoded .torrent buffer
+    fileSize: number;
+    pieceCount: number;
+    warnings?: string[];
+  }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (name && name.trim())                        formData.append('name', name.trim());
+    if (options?.pieceSize)                         formData.append('pieceSize', String(options.pieceSize));
+    if (options?.private)                           formData.append('private', '1');
+    if (options?.trackers && options.trackers.length > 0)
+      formData.append('trackers', JSON.stringify(options.trackers));
+
+    const res = await fetch(`${BASE_URL}/torrent/create-from-file`, {
+      method: 'POST',
+      headers: getAuthHeadersMultipart(),
+      body: formData,
+    });
+    return handleResponse(res);
+  },
+
+  // Add magnet link
   addMagnet: async (magnetURI: string): Promise<Torrent> => {
     const res = await fetch(`${BASE_URL}/torrent/create`, {
       method: 'POST',
