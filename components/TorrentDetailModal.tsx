@@ -84,6 +84,11 @@ export const TorrentDetailModal: React.FC<TorrentDetailModalProps> = ({ torrent,
             </h2>
             <div className="flex items-center gap-3 text-xs text-text-tertiary">
               <StatusBadge status={status} />
+              {/* 4.2 role badge in detail modal */}
+              {torrent.isOwner === false
+                ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">↓ Leeching</span>
+                : <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/15 text-green-400 border border-green-500/20">↑ Seeding</span>
+              }
               <span>{formatSize(torrent.size)}</span>
               <button
                 onClick={copyHash}
@@ -94,6 +99,12 @@ export const TorrentDetailModal: React.FC<TorrentDetailModalProps> = ({ torrent,
                 {torrent.infoHash?.substring(0, 8)}…
               </button>
             </div>
+            {/* 4.3 — uploader name for leechers */}
+            {torrent.isOwner === false && torrent.uploadedBy?.username && (
+              <p className="text-xs text-text-tertiary mt-1">
+                Uploaded by <span className="text-text-secondary font-medium">{torrent.uploadedBy.username}</span>
+              </p>
+            )}
           </div>
           <button 
             onClick={onClose}

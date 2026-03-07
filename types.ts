@@ -26,6 +26,8 @@ export interface Torrent {
     _id: string;
     username: string;
   };
+  isOwner?: boolean;         // true = you uploaded, false = you are leeching
+  createdAt?: string;
 }
 
 export interface TorrentFile {

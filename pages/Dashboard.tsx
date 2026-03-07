@@ -12,6 +12,7 @@ import {
   FileUp, Link, FolderInput, CheckCircle2, AlertTriangle, Copy,
   Settings2, PlusCircle, Lock, Download, Share2, ExternalLink
 } from 'lucide-react';
+import { QRCode } from '../components/QRCode';
 
 // Format bytes to human readable
 const formatSize = (bytes: number) => {
@@ -290,10 +291,15 @@ export const Dashboard: React.FC = () => {
     e.preventDefault();
     if (!magnetInput.trim()) return;
     try {
-      await torrentService.addMagnet(magnetInput);
+      const result = await torrentService.addMagnet(magnetInput);
       setMagnetInput('');
       closeAddModal();
-      toast.success('Added', 'Torrent added successfully');
+      // Backend returns 200 with message when torrent already in user's list
+      if ((result as any).message === 'Already in your list') {
+        toast.info('Already added', 'This torrent is already in your list');
+      } else {
+        toast.success('Added', 'Torrent added successfully');
+      }
       fetchData();
     } catch (err: any) {
       toast.error('Error', err.message || 'Failed to add torrent');
@@ -435,6 +441,12 @@ export const Dashboard: React.FC = () => {
     return counts;
   }, [torrents]);
 
+  // 4.4 — owned vs leeching breakdown
+  const ownershipCounts = useMemo(() => ({
+    owned:    torrents.filter(t => t.isOwner !== false).length,
+    leeching: torrents.filter(t => t.isOwner === false).length,
+  }), [torrents]);
+
   return (
     <div 
       className="max-w-6xl mx-auto px-4 py-6 relative"
@@ -516,6 +528,19 @@ export const Dashboard: React.FC = () => {
                   ? (stats.engine.totalUploaded / stats.engine.totalDownloaded).toFixed(2)
                   : '—'
               } />
+            </div>
+            {/* 4.4 — ownership breakdown */}
+            <div className="mt-3 pt-3 border-t border-border-subtle grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-[11px] text-text-tertiary">Seeding</span>
+                <span className="text-[11px] font-semibold text-text-primary ml-auto">{ownershipCounts.owned}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                <span className="text-[11px] text-text-tertiary">Leeching</span>
+                <span className="text-[11px] font-semibold text-text-primary ml-auto">{ownershipCounts.leeching}</span>
+              </div>
             </div>
           </div>
         )}
@@ -800,6 +825,36 @@ export const Dashboard: React.FC = () => {
                         <Copy size={13} />
                         <span className="hidden sm:inline">Copy</span>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* QR Code */}
+                  <div className="mb-4">
+                    <label className="block text-xs text-text-tertiary mb-2 font-medium">Scan to download</label>
+                    <div className="flex items-start gap-4">
+                      <div className="p-2 bg-bg-tertiary border border-border-subtle rounded-lg flex-shrink-0">
+                        <QRCode value={createResult.magnetURI} size={240} className="w-[120px] h-[120px]" />
+                      </div>
+                      <div className="flex flex-col justify-center gap-1.5 pt-1">
+                        <p className="text-xs text-text-secondary font-medium">Share this QR</p>
+                        <p className="text-xs text-text-tertiary leading-relaxed">
+                          Anyone who scans this can download directly from your machine — no middleman, no server.
+                        </p>
+                        <button
+                          onClick={() => {
+                            const canvas = document.querySelector<HTMLCanvasElement>('canvas[title="Scan to open magnet link"]');
+                            if (!canvas) return;
+                            const a = document.createElement('a');
+                            a.href = canvas.toDataURL('image/png');
+                            a.download = `${createResult!.name}-qr.png`;
+                            a.click();
+                          }}
+                          className="flex items-center gap-1.5 text-xs text-text-tertiary hover:text-accent transition-colors w-fit mt-1"
+                        >
+                          <Download size={11} />
+                          Save QR as PNG
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1182,6 +1237,11 @@ const TorrentRow: React.FC<TorrentRowProps> = ({ torrent, onPause, onResume, onD
     completed: 'bg-green-500',
   }[torrent.status] || 'bg-text-tertiary';
 
+  // 4.2 — role badge: owner = seeding (green), leecher = leeching (blue)
+  const roleBadge = torrent.isOwner === false
+    ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20 flex-shrink-0">↓ Leeching</span>
+    : <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/15 text-green-400 border border-green-500/20 flex-shrink-0">↑ Seeding</span>;
+
   return (
     <div 
       className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 px-4 py-3 border-b border-border-subtle last:border-b-0 hover:bg-bg-secondary/50 transition-colors cursor-pointer group"
@@ -1191,14 +1251,25 @@ const TorrentRow: React.FC<TorrentRowProps> = ({ torrent, onPause, onResume, onD
       <div className="sm:col-span-5 min-w-0 flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot} ${isDownloading ? 'animate-pulse' : ''}`} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-text-primary truncate" title={torrent.name}>
-            {torrent.name}
-          </p>
-          {/* Mobile: size + status */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-sm text-text-primary truncate" title={torrent.name}>
+              {torrent.name}
+            </p>
+            {roleBadge}
+          </div>
+          {/* 4.3 — uploader username for leechers */}
           <p className="text-xs text-text-tertiary sm:hidden">
             {formatSize(torrent.size || 0)}
+            {torrent.isOwner === false && torrent.uploadedBy?.username && (
+              <span className="ml-2 text-text-tertiary">by {torrent.uploadedBy.username}</span>
+            )}
             {isError && <span className="text-red-500 ml-2">Error</span>}
           </p>
+          {torrent.isOwner === false && torrent.uploadedBy?.username && (
+            <p className="hidden sm:block text-xs text-text-tertiary">
+              uploaded by <span className="text-text-secondary">{torrent.uploadedBy.username}</span>
+            </p>
+          )}
         </div>
       </div>
 
