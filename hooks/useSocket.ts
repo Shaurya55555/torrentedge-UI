@@ -19,16 +19,28 @@ interface SpeedEvent {
 // ==================== SHARED SOCKET SINGLETON ====================
 let sharedSocket: Socket | null = null;
 let socketRefCount = 0;
+let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
 const speedListeners = new Set<(data: SpeedEvent) => void>();
 const connectListeners = new Set<(connected: boolean) => void>();
+
+function clearScheduledDisconnect() {
+  if (disconnectTimer) {
+    clearTimeout(disconnectTimer);
+    disconnectTimer = null;
+  }
+}
 
 function getSharedSocket(): Socket | null {
   const token = localStorage.getItem('te_token');
   if (!token) return null;
 
+  clearScheduledDisconnect();
+
   if (!sharedSocket) {
     console.log('[Socket] Creating shared socket connection...');
     sharedSocket = io(window.location.origin, {
+      path: '/socket.io',
+      auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 10,
@@ -60,16 +72,21 @@ function getSharedSocket(): Socket | null {
 }
 
 function releaseSharedSocket() {
-  socketRefCount--;
-  if (socketRefCount <= 0 && sharedSocket) {
+  socketRefCount = Math.max(0, socketRefCount - 1);
+  if (socketRefCount > 0 || !sharedSocket || disconnectTimer) return;
+
+  disconnectTimer = setTimeout(() => {
+    disconnectTimer = null;
+
+    if (socketRefCount > 0 || !sharedSocket) return;
+
     console.log('[Socket] Releasing shared socket...');
     sharedSocket.emit('unsubscribe:all');
     sharedSocket.disconnect();
     sharedSocket = null;
-    socketRefCount = 0;
     speedListeners.clear();
     connectListeners.clear();
-  }
+  }, 1000);
 }
 
 // ==================== MAIN SOCKET HOOK ====================

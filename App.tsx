@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { Settings } from './pages/Settings';
 import { LoginPage } from './pages/LoginPage';
@@ -11,33 +11,70 @@ import { UserProfile } from './types';
 
 type Page = 'dashboard' | 'settings';
 
+let healthPollRefCount = 0;
+let healthPollInterval: ReturnType<typeof setInterval> | null = null;
+
+const startHealthPolling = (poll: () => void, intervalMs: number) => {
+  if (!healthPollInterval) {
+    healthPollInterval = setInterval(poll, intervalMs);
+  }
+  healthPollRefCount += 1;
+};
+
+const stopHealthPolling = () => {
+  healthPollRefCount = Math.max(0, healthPollRefCount - 1);
+  if (healthPollRefCount === 0 && healthPollInterval) {
+    clearInterval(healthPollInterval);
+    healthPollInterval = null;
+  }
+};
+
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('te_token'));
   const [user, setUser] = useState<UserProfile | null>(null);
   const [healthStatus, setHealthStatus] = useState<'ok' | 'error' | 'loading'>('loading');
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        await healthService.check();
-        setHealthStatus('ok');
-      } catch {
-        setHealthStatus('error');
-      }
-    };
-    checkHealth();
-    const interval = setInterval(checkHealth, 30000);
-    return () => clearInterval(interval);
+  const checkHealth = useCallback(async () => {
+    if (document.visibilityState !== 'visible') return;
+    try {
+      await healthService.check();
+      setHealthStatus('ok');
+    } catch {
+      setHealthStatus('error');
+    }
   }, []);
 
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkHealth();
+      }
+    };
+
+    checkHealth();
+    startHealthPolling(checkHealth, 60000);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stopHealthPolling();
+    };
+  }, [checkHealth]);
+
   // Fetch user profile when authenticated
+  const hasFetchedProfileRef = useRef(false);
+
   useEffect(() => {
     if (isAuthenticated) {
+      if (hasFetchedProfileRef.current) return;
+      hasFetchedProfileRef.current = true;
+
       userService.getProfile()
         .then(setUser)
         .catch(() => setUser(null));
     } else {
+      hasFetchedProfileRef.current = false;
       setUser(null);
     }
   }, [isAuthenticated]);

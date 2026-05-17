@@ -22,7 +22,7 @@ interface LoginPageProps {
   onAuthSuccess: (token: string) => void;
 }
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '82443172011-epqpinmfmil3inigvr9gf346kvmg3u72.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -72,6 +72,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     const initializeGoogle = () => {
       if (!mounted) return;
       
+      // Skip Google initialization if no client ID configured
+      if (!GOOGLE_CLIENT_ID) {
+        console.warn('[Google Auth] No VITE_GOOGLE_CLIENT_ID configured, Google Sign-In disabled');
+        setGoogleLoaded(false);
+        return;
+      }
+      
       if (!window.google) {
         console.error('[Google Auth] Google SDK not loaded');
         return;
@@ -83,7 +90,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
         return;
       }
 
-      console.log('[Google Auth] Initializing with client ID:', GOOGLE_CLIENT_ID);
+      console.log('[Google Auth] Initializing with client ID:', GOOGLE_CLIENT_ID.substring(0, 20) + '...');
       
       try {
         // Cancel any previous Google prompt
@@ -194,29 +201,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
           </div>
         )}
 
-        {/* Google Sign-In Button */}
-        <div className="mb-6 flex justify-center min-h-[44px]">
-          {!googleLoaded && !error && (
-            <div className="flex items-center gap-2 text-text-tertiary text-sm">
-              <Loader2 className="animate-spin" size={16} />
-              <span>Loading Google Sign-In...</span>
+        {/* Google Sign-In Button - only show if configured */}
+        {GOOGLE_CLIENT_ID && (
+          <>
+            <div className="mb-6 flex justify-center min-h-[44px]">
+              {!googleLoaded && !error && (
+                <div className="flex items-center gap-2 text-text-tertiary text-sm">
+                  <Loader2 className="animate-spin" size={16} />
+                  <span>Loading Google Sign-In...</span>
+                </div>
+              )}
+              <div 
+                ref={googleButtonRef} 
+                className={googleLoaded ? '' : 'hidden'}
+              ></div>
             </div>
-          )}
-          <div 
-            ref={googleButtonRef} 
-            className={googleLoaded ? '' : 'hidden'}
-          ></div>
-        </div>
 
-        {/* Divider */}
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border-subtle"></div>
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="px-3 bg-bg-primary text-text-tertiary">or continue with email</span>
-          </div>
-        </div>
+            {/* Divider */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border-subtle"></div>
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-bg-primary text-text-tertiary">or continue with email</span>
+              </div>
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {!isLogin && (

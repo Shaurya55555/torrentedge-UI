@@ -32,6 +32,24 @@ type SortField = 'name' | 'size' | 'progress' | 'speed' | 'added';
 type SortDir = 'asc' | 'desc';
 type StatusFilter = 'all' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
 
+let dashboardPollRefCount = 0;
+let dashboardPollInterval: ReturnType<typeof setInterval> | null = null;
+
+const startDashboardPolling = (poll: () => void, intervalMs: number) => {
+  if (!dashboardPollInterval) {
+    dashboardPollInterval = setInterval(poll, intervalMs);
+  }
+  dashboardPollRefCount += 1;
+};
+
+const stopDashboardPolling = () => {
+  dashboardPollRefCount = Math.max(0, dashboardPollRefCount - 1);
+  if (dashboardPollRefCount === 0 && dashboardPollInterval) {
+    clearInterval(dashboardPollInterval);
+    dashboardPollInterval = null;
+  }
+};
+
 export const Dashboard: React.FC = () => {
   const [torrents, setTorrents] = useState<Torrent[]>([]);
   const [stats, setStats] = useState<SystemStats | null>(null);
@@ -119,9 +137,25 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+    const pollOnce = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetchData();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        pollOnce();
+      }
+    };
+
+    pollOnce();
+    startDashboardPolling(pollOnce, 15000);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stopDashboardPolling();
+    };
   }, [fetchData]);
 
   // Keyboard shortcuts
