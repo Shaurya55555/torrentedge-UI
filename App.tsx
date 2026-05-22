@@ -35,6 +35,23 @@ const App: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<'ok' | 'error' | 'loading'>('loading');
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 
+  // Handle OAuth redirect callback — extract token from URL if present
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const authError = params.get('auth_error');
+
+    if (token) {
+      localStorage.setItem('te_token', token);
+      setIsAuthenticated(true);
+      // Clean the URL so the token isn't visible/bookmarkable
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (authError) {
+      console.error('[OAuth] Auth error from redirect:', authError);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const checkHealth = useCallback(async () => {
     if (document.visibilityState !== 'visible') return;
     try {

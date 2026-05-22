@@ -1,170 +1,38 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import { authService } from '../services/api';
 import { Mail, Key, User, Loader2 } from 'lucide-react';
-
-// Extend window for Google's GSI
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: any) => void;
-          renderButton: (element: HTMLElement, options: any) => void;
-          prompt: () => void;
-          cancel: () => void;
-        };
-      };
-    };
-  }
-}
 
 interface LoginPageProps {
   onAuthSuccess: (token: string) => void;
 }
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+
+// Google SVG icon for the button
+const GoogleIcon: React.FC = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+    <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+    <path d="M3.964 10.706A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
+    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+  </svg>
+);
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [googleLoaded, setGoogleLoaded] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
   });
-  const googleButtonRef = useRef<HTMLDivElement>(null);
-  const isInitializedRef = useRef(false);
 
-  // Stable callback for Google Sign-In
-  const handleGoogleResponse = useCallback(async (response: any) => {
-    console.log('[Google Auth] Response received:', response);
-    
-    if (!response.credential) {
-      console.error('[Google Auth] No credential in response:', response);
-      setError('Google authentication failed: No credential received');
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      console.log('[Google Auth] Sending credential to backend...');
-      const data = await authService.googleAuth(response.credential);
-      console.log('[Google Auth] Backend response:', data);
-      onAuthSuccess(data.token);
-    } catch (err: any) {
-      console.error('[Google Auth] Backend error:', err);
-      setError(err.message || 'Google authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  }, [onAuthSuccess]);
-
-  // Initialize Google Sign-In
-  useEffect(() => {
-    let checkInterval: NodeJS.Timeout | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
-    let mounted = true;
-
-    const initializeGoogle = () => {
-      if (!mounted) return;
-      
-      // Skip Google initialization if no client ID configured
-      if (!GOOGLE_CLIENT_ID) {
-        console.warn('[Google Auth] No VITE_GOOGLE_CLIENT_ID configured, Google Sign-In disabled');
-        setGoogleLoaded(false);
-        return;
-      }
-      
-      if (!window.google) {
-        console.error('[Google Auth] Google SDK not loaded');
-        return;
-      }
-      
-      if (!googleButtonRef.current) {
-        console.warn('[Google Auth] Button ref not ready, retrying...');
-        setTimeout(initializeGoogle, 100);
-        return;
-      }
-
-      console.log('[Google Auth] Initializing with client ID:', GOOGLE_CLIENT_ID.substring(0, 20) + '...');
-      
-      try {
-        // Cancel any previous Google prompt
-        if (isInitializedRef.current) {
-          window.google.accounts.id.cancel();
-        }
-        
-        // Clear previous button content
-        googleButtonRef.current.innerHTML = '';
-        
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleResponse,
-          use_fedcm_for_prompt: false,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
-
-        window.google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: 'filled_black',
-          size: 'large',
-          width: 320,
-          text: isLogin ? 'signin_with' : 'signup_with',
-          shape: 'rectangular',
-        });
-        
-        isInitializedRef.current = true;
-        setGoogleLoaded(true);
-        console.log('[Google Auth] Initialization complete');
-      } catch (err) {
-        console.error('[Google Auth] Initialization error:', err);
-        setError('Failed to initialize Google Sign-In');
-      }
-    };
-
-    // Check if Google script is already loaded
-    if (window.google) {
-      console.log('[Google Auth] Google SDK already loaded');
-      initializeGoogle();
-    } else {
-      console.log('[Google Auth] Waiting for Google SDK to load...');
-      // Wait for script to load
-      checkInterval = setInterval(() => {
-        if (window.google) {
-          if (checkInterval) clearInterval(checkInterval);
-          initializeGoogle();
-        }
-      }, 100);
-
-      // Timeout after 10 seconds
-      timeoutId = setTimeout(() => {
-        if (checkInterval) clearInterval(checkInterval);
-        if (mounted && !window.google) {
-          console.error('[Google Auth] Google SDK failed to load (timeout)');
-          setError('Google Sign-In unavailable. Please try email login or disable ad blockers.');
-        }
-      }, 10000);
-    }
-
-    // Cleanup function
-    return () => {
-      mounted = false;
-      if (checkInterval) clearInterval(checkInterval);
-      if (timeoutId) clearTimeout(timeoutId);
-      // Cancel Google prompt on unmount
-      if (window.google && isInitializedRef.current) {
-        try {
-          window.google.accounts.id.cancel();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-      }
-    };
-  }, [isLogin, handleGoogleResponse]);
+  // Redirect-based Google OAuth — bypasses GSI iframe completely
+  const handleGoogleLogin = () => {
+    // Navigate directly to backend (not through Vite proxy) for proper redirect handling
+    window.location.href = 'http://localhost:3029/api/auth/google/redirect';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,20 +69,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
           </div>
         )}
 
-        {/* Google Sign-In Button - only show if configured */}
+        {/* Google Sign-In Button — uses server redirect (no iframe) */}
         {GOOGLE_CLIENT_ID && (
           <>
-            <div className="mb-6 flex justify-center min-h-[44px]">
-              {!googleLoaded && !error && (
-                <div className="flex items-center gap-2 text-text-tertiary text-sm">
-                  <Loader2 className="animate-spin" size={16} />
-                  <span>Loading Google Sign-In...</span>
-                </div>
-              )}
-              <div 
-                ref={googleButtonRef} 
-                className={googleLoaded ? '' : 'hidden'}
-              ></div>
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded border border-gray-300 text-sm transition-colors"
+              >
+                <GoogleIcon />
+                Sign in with Google
+              </button>
             </div>
 
             {/* Divider */}
