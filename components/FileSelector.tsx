@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Square, RefreshCw, File } from 'lucide-react';
+import { Check, Square, RefreshCw, File, Download } from 'lucide-react';
 import { torrentService } from '../services/api';
 import { FileWithSelection } from '../types';
 
@@ -21,6 +21,49 @@ export const FileSelector: React.FC<FileSelectorProps> = ({ torrentId }) => {
   const [saving, setSaving] = useState(false);
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
+
+  const baseUrl =
+    (import.meta as any).env?.VITE_API_URL ||
+    (import.meta as any).env?.REACT_APP_API_URL ||
+    (typeof process !== 'undefined' ? (process as any).env?.REACT_APP_API_URL : undefined) ||
+    'http://localhost:3029';
+
+  const getDownloadUrl = (fileIndex: number) =>
+    `${baseUrl}/api/torrent/${torrentId}/download?fileIndex=${fileIndex}`;
+
+  const handleDownload = async (event: React.MouseEvent, file: FileWithSelection, fileName: string) => {
+    event.stopPropagation();
+    const token = localStorage.getItem('te_token');
+    const downloadUrl = getDownloadUrl(file.index);
+
+    if (!token) {
+      return;
+    }
+
+    event.preventDefault();
+
+    try {
+      const res = await fetch(downloadUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error('Download failed');
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download file:', err);
+    }
+  };
 
   useEffect(() => {
     const fetchFiles = async () => {
@@ -91,6 +134,8 @@ export const FileSelector: React.FC<FileSelectorProps> = ({ torrentId }) => {
         {files.map((file) => {
           const isSelected = selection.has(file.index);
           const name = Array.isArray(file.path) ? file.path.join('/') : (file.name || file.path);
+          const fileName = typeof name === 'string' ? (name.split('/').pop() || 'download') : 'download';
+          const downloadUrl = getDownloadUrl(file.index);
           
           return (
             <div
@@ -106,6 +151,15 @@ export const FileSelector: React.FC<FileSelectorProps> = ({ torrentId }) => {
               <File size={12} className="flex-shrink-0" />
               <span className="flex-1 truncate" title={name}>{name}</span>
               <span className="text-text-tertiary">{formatSize(file.length)}</span>
+              <a
+                href={downloadUrl}
+                download={fileName}
+                onClick={(event) => handleDownload(event, file, fileName)}
+                className="ml-1 inline-flex items-center justify-center p-1 rounded text-text-tertiary hover:text-accent hover:bg-bg-hover transition-colors"
+                title="Download"
+              >
+                <Download size={12} />
+              </a>
             </div>
           );
         })}
