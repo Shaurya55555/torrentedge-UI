@@ -1,8 +1,8 @@
 import React from 'react';
-import { LogOut, Settings, LayoutDashboard, User } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, User, UploadCloud } from 'lucide-react';
 import { useConnectionStatus } from '../hooks/useConnectionStatus';
 
-type Page = 'dashboard' | 'settings';
+type Page = 'dashboard' | 'settings' | 'dropzone';
 
 interface NavbarProps {
   isAuthenticated: boolean;
@@ -51,6 +51,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Nav tabs - desktop */}
           {isAuthenticated && (
             <div className="hidden sm:flex items-center gap-1">
+              <NavTab 
+                active={currentPage === 'dropzone'} 
+                onClick={() => onNavigate?.('dropzone')}
+                icon={<UploadCloud size={15} />}
+              >
+                Dropzone
+              </NavTab>
               <NavTab 
                 active={currentPage === 'dashboard'} 
                 onClick={() => onNavigate?.('dashboard')}

@@ -1,7 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Settings, LogOut, UploadCloud } from 'lucide-react';
 
-type Page = 'dashboard' | 'settings';
+type Page = 'dashboard' | 'settings' | 'dropzone';
 
 interface MobileNavProps {
   currentPage: Page;
@@ -11,27 +11,35 @@ interface MobileNavProps {
 
 export const MobileNav: React.FC<MobileNavProps> = ({ currentPage, onNavigate, onLogout }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-14 bg-bg-primary border-t border-border-subtle z-50 sm:hidden">
-      <div className="h-full flex items-center justify-around">
-        <NavButton 
-          active={currentPage === 'dashboard'} 
+    <div className="sm:hidden fixed bottom-0 left-0 right-0 h-16 bg-bg-primary border-t border-border-subtle z-50">
+      <div className="flex h-full max-w-md mx-auto">
+        <NavButton
+          active={currentPage === 'dropzone'}
+          onClick={() => onNavigate('dropzone')}
+          icon={<UploadCloud size={20} />}
+          label="Dropzone"
+        />
+        <NavButton
+          active={currentPage === 'dashboard'}
           onClick={() => onNavigate('dashboard')}
           icon={<LayoutDashboard size={20} />}
           label="Downloads"
         />
-        <NavButton 
-          active={currentPage === 'settings'} 
+        <NavButton
+          active={currentPage === 'settings'}
           onClick={() => onNavigate('settings')}
           icon={<Settings size={20} />}
           label="Settings"
         />
-        <NavButton 
+        <button
           onClick={onLogout}
-          icon={<LogOut size={20} />}
-          label="Logout"
-        />
+          className="flex-1 flex flex-col items-center justify-center gap-1 text-text-tertiary hover:text-red-400 hover:bg-bg-hover transition-colors"
+        >
+          <LogOut size={20} />
+          <span className="text-[10px] font-medium">Logout</span>
+        </button>
       </div>
-    </nav>
+    </div>
   );
 };
 

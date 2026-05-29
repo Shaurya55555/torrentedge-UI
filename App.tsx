@@ -9,7 +9,9 @@ import { ConfirmProvider } from './components/ConfirmDialog';
 import { healthService, userService } from './services/api';
 import { UserProfile } from './types';
 
-type Page = 'dashboard' | 'settings';
+import { UniversalDropzone } from './pages/UniversalDropzone';
+
+type Page = 'dashboard' | 'settings' | 'dropzone';
 
 let healthPollRefCount = 0;
 let healthPollInterval: ReturnType<typeof setInterval> | null = null;
@@ -33,7 +35,7 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('te_token'));
   const [user, setUser] = useState<UserProfile | null>(null);
   const [healthStatus, setHealthStatus] = useState<'ok' | 'error' | 'loading'>('loading');
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [currentPage, setCurrentPage] = useState<Page>('dropzone');
 
   // Handle OAuth redirect callback — extract token from URL if present
   useEffect(() => {
@@ -133,14 +135,16 @@ const App: React.FC = () => {
           <Navbar 
             isAuthenticated={isAuthenticated} 
             onLogout={handleLogout}
-            currentPage={currentPage}
-            onNavigate={setCurrentPage}
+            currentPage={currentPage as any}
+            onNavigate={setCurrentPage as any}
             username={user?.username}
           />
           
           <main className="pt-12 pb-16 sm:pb-6">
             {isAuthenticated ? (
-              currentPage === 'settings' ? <Settings /> : <Dashboard />
+              currentPage === 'settings' ? <Settings /> : 
+              currentPage === 'dashboard' ? <Dashboard /> :
+              <UniversalDropzone />
             ) : (
               <LoginPage onAuthSuccess={handleAuthSuccess} />
             )}
@@ -149,8 +153,8 @@ const App: React.FC = () => {
           {/* Mobile bottom nav */}
           {isAuthenticated && (
             <MobileNav 
-              currentPage={currentPage}
-              onNavigate={setCurrentPage}
+              currentPage={currentPage as any}
+              onNavigate={setCurrentPage as any}
               onLogout={handleLogout}
             />
           )}
